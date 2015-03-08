@@ -2,22 +2,20 @@
 
 var kivi = require('kivi');
 var Scheduler = require('kivi/lib/scheduler');
+var vdom = kivi.vdom;
 
-var Hello = kivi.Component.declare({
-  name: 'examples.Hello',
+var Hello = vdom.declareComponent({
   build: function() {
-    var root = kivi.VNode.root();
-    root.children = [kivi.VNode.text('Hello ' + this.props.name)];
+    var root = vdom.r();
+    root.children = [vdom.t('Hello ' + this.props.name)];
     return root;
   }
 });
 
 document.addEventListener('DOMContentLoaded', function(_) {
-  kivi.ENV.scheduler = new Scheduler();
+  kivi.init(new Scheduler());
 
-  kivi.ENV.scheduler.nextFrame().write(function() {
-    var c = kivi.Component.create(Hello, {name: 'World'});
-    document.body.appendChild(c.element);
-    c.update();
+  kivi.nextFrame().write(function() {
+    vdom.injectComponent(vdom.createComponent(Hello, {name: 'World'}), document.body);
   });
 });

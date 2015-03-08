@@ -2,11 +2,12 @@
 
 var kivi = require('kivi');
 var Scheduler = require('kivi/lib/scheduler');
+var DNode = kivi.DNode;
+var vdom = kivi.vdom;
 
 var _itemUid = 0;
 function ItemStore() {
-  this.items = kivi.DNode.create();
-  this.items.data = [];
+  this.items = DNode.create([]);
 }
 
 ItemStore.prototype.getAll = function() {
@@ -14,11 +15,10 @@ ItemStore.prototype.getAll = function() {
 };
 
 ItemStore.prototype.add = function(props) {
-  var item = kivi.DNode.create();
-  item.data = {
+  var item = kivi.DNode.create({
     id: _itemUid++,
     text: props.text
-  };
+  });
   this.items.data.push(item);
   this.items.commit();
 };
@@ -27,28 +27,22 @@ var store = {
   items: null
 };
 
-var TodoItem = kivi.Component.declare({
+var TodoItem = vdom.declareComponent({
   tag: 'li',
 
   updateState: function() {
     this.state.sub(this.props.item);
-    this.state.update();
+    this.state.update(true);
   },
 
   build: function() {
-    var root = kivi.VNode.root();
-    root.children = [kivi.VNode.text(this.props.item.data.text)];
+    var root = vdom.r();
+    root.children = [vdom.t(this.props.item.data.text)];
     return root;
   }
 });
 
-var TodoApp = kivi.Component.declare({
-  updateState: function() {
-    var items = store.items.getAll();
-    this.state.data.items = items;
-    this.state.sub(items);
-    this.state.update();
-  },
+var TodoApp = vdom.declareComponent({
   init: function() {
     var self = this;
 
@@ -72,40 +66,46 @@ var TodoApp = kivi.Component.declare({
     });
   },
 
+  updateState: function() {
+    var items = store.items.getAll();
+    this.state.data.items = items;
+    this.state.sub(items);
+    this.state.update(true);
+  },
+
   build: function() {
     var items = this.state.data.items.data;
-    var title = kivi.VNode.element('h2');
-    title.children = [kivi.VNode.text('TODO')];
+    var title = vdom.e('h2');
+    title.children = [vdom.t('TODO')];
 
-    var todoList = kivi.VNode.element('ul');
+    var todoList = vdom.e('ul');
     var children = [];
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
-      children.push(kivi.VNode.component(TodoItem, {item: item}));
+      children.push(vdom.$c(item.id, TodoItem, {item: item}));
     }
     todoList.children = children;
 
-    var form = kivi.VNode.element('form');
-    var input = this.state.data.inputElement = kivi.VNode.element('input');
-    var button = kivi.VNode.element('button');
+    var form = vdom.e('form');
+    var input = this.state.data.inputElement = vdom.e('input');
+    var button = vdom.e('button');
     button.type = 'AddButton';
-    button.children = [kivi.VNode.text('Add Item')];
+    button.children = [vdom.t('Add Item')];
 
     form.children = [input, button];
 
-    var root = kivi.VNode.root();
+    var root = vdom.r();
     root.children = [title, todoList, form];
     return root;
   }
 });
 
 document.addEventListener('DOMContentLoaded', function(_) {
-  kivi.ENV.scheduler = new Scheduler();
+  kivi.init(new Scheduler());
+
   store.items = new ItemStore();
 
-  kivi.ENV.scheduler.nextFrame().write(function() {
-    var c = kivi.Component.create(TodoApp);
-    document.body.appendChild(c.element);
-    c.update();
+  kivi.nextFrame().write(function() {
+    vdom.injectComponent(vdom.createComponent(TodoApp), document.body);
   });
 });

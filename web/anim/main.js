@@ -2,23 +2,26 @@
 
 var kivi = require('kivi');
 var Scheduler = require('kivi/lib/scheduler');
+var DNode = kivi.DNode;
+var vdom = kivi.vdom;
 
 var N = 100;
 var V = 10;
 
 function BoxStore() {
-  this._boxes = kivi.DNode.create();
-  this._boxes.data = [];
+  var boxes = [];
   for (var i = 0; i < N; i++) {
-    var box = kivi.DNode.create();
-    box.data = 0;
-    this._boxes.data.push(box);
+    boxes.push(kivi.DNode.create(0));
   }
+
+  this._boxes = DNode.create(boxes);
 
   var self = this;
   setInterval(function() {
     for (var i = 0; i < V; i++) {
-      self.increment(i);
+      var b = boxes[i];
+      b.data++;
+      b.commit();
     }
   }, 0);
 }
@@ -31,22 +34,16 @@ BoxStore.prototype.getAll = function() {
   return this._boxes;
 };
 
-BoxStore.prototype.increment = function(id) {
-  var box = this._boxes.data[id];
-  box.data += 1;
-  box.commit();
-};
-
 var store = {
   box: null
 };
 
-var Box = kivi.Component.declare({
+var Box = vdom.declareComponent({
   updateState: function() {
     var box = store.box.get(this.props.id);
     this.state.data = box;
     this.state.sub(box);
-    this.state.update();
+    this.state.update(true);
   },
 
   build: function() {
@@ -56,39 +53,38 @@ var Box = kivi.Component.declare({
     var color = i % 255;
     var content = i % 100;
 
-    var root = kivi.VNode.root();
-    root.type = 'BoxRoot';
-
-    var box = kivi.VNode.element('div');
+    var box = vdom.e('div');
     box.type = 'Box';
     box.style = {
       top: top + 'px',
       left: left + 'px',
       background: 'rgb(0,0,' + color + ')'
     };
+    box.children = [vdom.t(content)];
 
+    var root = vdom.r();
+    root.type = 'BoxRoot';
     root.children = [box];
-    box.children = [kivi.VNode.text(content)];
 
     return root;
   }
 });
 
-var Anim = kivi.Component.declare({
+var Anim = vdom.declareComponent({
   updateState: function() {
     var boxes = this.state.data = store.box.getAll();
     this.state.sub(boxes);
-    this.state.update();
+    this.state.update(true);
   },
 
   build: function() {
     var items = this.state.data.data;
-    var root = kivi.VNode.root();
+    var root = vdom.r();
     root.type = 'Grid';
 
     var children = [];
     for (var i = 0; i < items.length; i++) {
-      children.push(kivi.VNode.component(Box, {id: i}));
+      children.push(vdom.c(Box, {id: i}));
     }
 
     root.children = children;
@@ -97,12 +93,11 @@ var Anim = kivi.Component.declare({
 });
 
 document.addEventListener('DOMContentLoaded', function(_) {
-  kivi.ENV.scheduler = new Scheduler();
+  kivi.init(new Scheduler());
+
   store.box = new BoxStore();
 
-  kivi.ENV.scheduler.nextFrame().write(function() {
-    var c = kivi.Component.create(Anim);
-    document.body.appendChild(c.element);
-    c.update();
+  kivi.nextFrame().write(function() {
+    vdom.injectComponent(vdom.createComponent(Anim), document.body);
   });
 });
