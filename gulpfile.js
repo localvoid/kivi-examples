@@ -23,7 +23,8 @@ var EXAMPLES = [
   'basic',
   'anim',
   'todo',
-  'value-diff'
+  'value-diff',
+  'form'
 ];
 
 gulp.task('clean', del.bind(null, [DEST]));
