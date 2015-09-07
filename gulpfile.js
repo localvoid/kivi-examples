@@ -1,84 +1,102 @@
 'use strict';
 
 var gulp = require('gulp');
-var gulp_if = require('gulp-if');
 var del = require('del');
-var source = require('vinyl-source-stream');
-var buffer = require('vinyl-buffer');
-var sourcemaps = require('gulp-sourcemaps');
-var uglify = require('gulp-uglify');
-var browserify = require('browserify');
-var deploy = require('gulp-gh-pages');
-
+var closureCompiler = require('gulp-closure-compiler');
+var jstyle = require('gulp-jstyle');
+var replaceIds = require('gulp-replace-ids');
 var browserSync = require('browser-sync');
-var reload = browserSync.reload;
+var ghPages = require('gulp-gh-pages');
 
-var NODE_ENV = process.env.NODE_ENV || 'development';
-var BROWSERSYNC_PORT = parseInt(process.env.BROWSERSYNC_PORT) || 3000;
-var RELEASE = (NODE_ENV === 'production');
-var DEST = './build';
+var BUILD_MINIFY = process.env['BUILD_MINIFY'] ? true : false;
+var BUILD_DEBUG = process.env['BUILD_DEBUG'] ? true : false;
 
-var EXAMPLES = [
-  'hello',
-  'basic',
-  'anim',
-  'todo',
-  'value-diff',
-  'form'
-];
+var CLOSURE_OPTS = {
+  fileName: 'main.js',
+  compilerPath: 'node_modules/closurecompiler/compiler/compiler.jar',
+  continueWithWarnings: true,
+  compilerFlags: {
+    define: [],
+    closure_entry_point: 'main',
+    compilation_level: 'ADVANCED_OPTIMIZATIONS',
+    language_in: 'ECMASCRIPT6_STRICT',
+    language_out: 'ECMASCRIPT5_STRICT',
+    use_types_for_optimization: true,
+    only_closure_dependencies: true,
+    output_wrapper: '(function(){%output%}).call();',
+    warning_level: 'VERBOSE',
+    jscomp_warning: 'reportUnknownTypes',
+    summary_detail_level: 3
+  }
+};
 
-gulp.task('clean', del.bind(null, [DEST]));
-
-for (var i = 0; i < EXAMPLES.length; i++) {
-  var e = EXAMPLES[i];
-  var out = DEST + '/' + e;
-
-  gulp.task('example-script-' + e, function(e, out) {
-    var bundler = browserify({
-      entries: ['./web/' + e + '/main.js'],
-      debug: !RELEASE
-    });
-
-    return bundler
-      .bundle()
-      .pipe(source('main.js'))
-      .pipe(buffer())
-      .pipe(sourcemaps.init({loadMaps: true}))
-      .pipe(gulp_if(RELEASE, uglify()))
-      .pipe(sourcemaps.write('./'))
-      .pipe(gulp.dest(out))
-      .pipe(reload({stream: true}));
-  }.bind(null, e, out));
-
-  gulp.task('example-html-' + e , function(e, out) {
-    gulp.src('./web/' + e + '/index.html')
-      .pipe(gulp.dest(out))
-      .pipe(reload({stream: true}));
-  }.bind(null, e, out));
+if (!BUILD_MINIFY) {
+  CLOSURE_OPTS.compilerFlags.compilation_level = 'SIMPLE_OPTIMIZATIONS';
+  CLOSURE_OPTS.compilerFlags.formatting = 'PRETTY_PRINT';
+}
+if (!BUILD_DEBUG) {
+  CLOSURE_OPTS.compilerFlags.define.push('goog.DEBUG=false', 'kivi.DEBUG=false');
 }
 
-gulp.task('example-scripts', EXAMPLES.map(function(e) { return 'example-script-' + e; }));
-gulp.task('example-htmls', EXAMPLES.map(function(e) { return 'example-html-' + e; }));
-gulp.task('examples', ['example-scripts', 'example-htmls']);
+var EXAMPLES = ['hello', 'anim'];
 
-gulp.task('serve', ['default'], function() {
+gulp.task('clean', del.bind(null, ['build', 'dist']));
+
+EXAMPLES.forEach(function(name) {
+  gulp.task('js:' + name, ['css:' + name], function() {
+    return gulp.src([
+        'node_modules/kivi/src/**/*.js',
+        'src/base.js',
+        'build/' + name + '/css/css_map.js',
+        'src/' + name + '/main.js'])
+        .pipe(closureCompiler(CLOSURE_OPTS))
+        .pipe(gulp.dest('build/' + name));
+  });
+
+  gulp.task('html:' + name, ['css:' + name], function() {
+    return gulp.src('src/' + name + '/index.html')
+        .pipe(replaceIds({
+          dict: BUILD_MINIFY ? 'build/' + name + '/css/css_map.json' : {},
+          pattern: "{{\ *getCssName\ +\"([a-zA-Z0-9_-]+)\"\ *}}"
+        }))
+        .pipe(gulp.dest('build/' + name))
+        .pipe(browserSync.reload({stream: true}));
+  });
+
+  gulp.task('css:' + name, function() {
+    return gulp.src('src/' + name + '/css.js')
+        .pipe(jstyle({
+          minifyClassNames: BUILD_MINIFY,
+          closureMap: true
+        }))
+        .pipe(gulp.dest('build/' + name + '/css'))
+        .pipe(browserSync.reload({stream: true}));
+  });
+});
+
+gulp.task('js', EXAMPLES.map(function(name) { return 'js:' + name }));
+gulp.task('html', EXAMPLES.map(function(name) { return 'html:' + name }));
+gulp.task('css', EXAMPLES.map(function(name) { return 'css:' + name }));
+gulp.task('build', ['css', 'html', 'js']);
+
+gulp.task('serve', ['build'], function() {
   browserSync({
     open: false,
-    port: BROWSERSYNC_PORT,
+    port: 3000,
     notify: false,
     server: 'build'
   });
 
-  for (var i = 0; i < EXAMPLES.length; i++) {
-    var e = EXAMPLES[i];
-    gulp.watch('./web/' + e + '/main.js', ['example-script-' + e]);
-    gulp.watch('./web/' + e + '/index.html', ['example-html-' + e]);
-  }
+  EXAMPLES.forEach(function(name) {
+    gulp.watch('src/' + name + '/main.js', ['js:' + name]);
+    gulp.watch('src/' + name + '/index.html', ['html:' + name]);
+    gulp.watch('src/' + name + '/css.js', ['css:' + name, 'html:' + name, 'js:' + name]);
+  });
 });
 
 gulp.task('deploy', ['default'], function () {
-  return gulp.src(DEST + '/**/*')
-    .pipe(deploy());
+  return gulp.src('build/**/*')
+      .pipe(ghPages());
 });
 
-gulp.task('default', ['examples']);
+gulp.task('default', ['build']);
