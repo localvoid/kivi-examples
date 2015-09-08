@@ -1,9 +1,7 @@
 goog.provide('main');
 goog.provide('main.ui');
-goog.provide('main.ui.box');
 goog.provide('main.ui.anim');
-goog.require('base');
-goog.require('css.map.css');
+goog.provide('main.ui.box');
 goog.require('kivi');
 
 /** @const {number} */
@@ -31,7 +29,8 @@ main.Box = function(value) {
  * @final
  */
 main.BoxStore = function() {
-  var boxes = this.boxes = /** @type {!Array<!main.Box>} */([]);
+  /** @type {!Array<!main.Box>} */ this.boxes = [];
+  var boxes = this.boxes;
   for (var i = 0; i < main.N; i++) {
     boxes.push(new main.Box(0));
   }
@@ -91,12 +90,10 @@ main.ui.anim.d.update = function(c) {
   c.syncVRoot(kivi.createRoot().type(goog.getCssName('Grid')).children(children));
 };
 
-kivi.init(new kivi.Scheduler());
-
 document.addEventListener('DOMContentLoaded', function() {
   var state = new main.BoxStore();
 
   kivi.nextFrame().write(function() {
-    kivi.injectComponent(main.ui.anim.d, state, document.body);
+    kivi.injectComponent(main.ui.anim.d, state, /** @type {!Element} */(document.body));
   });
 });

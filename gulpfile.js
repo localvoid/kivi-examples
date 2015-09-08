@@ -10,6 +10,7 @@ var ghPages = require('gulp-gh-pages');
 
 var BUILD_MINIFY = process.env['BUILD_MINIFY'] ? true : false;
 var BUILD_DEBUG = process.env['BUILD_DEBUG'] ? true : false;
+var CLOSURE_NTI = process.env['CLOSURE_NTI'] ? true : false;
 
 var CLOSURE_OPTS = {
   fileName: 'main.js',
@@ -17,15 +18,15 @@ var CLOSURE_OPTS = {
   continueWithWarnings: true,
   compilerFlags: {
     define: [],
-    closure_entry_point: 'main',
+    closure_entry_point: ['css.map.css', 'main'],
     compilation_level: 'ADVANCED_OPTIMIZATIONS',
     language_in: 'ECMASCRIPT6_STRICT',
     language_out: 'ECMASCRIPT5_STRICT',
-    use_types_for_optimization: true,
-    only_closure_dependencies: true,
+    use_types_for_optimization: null,
+    only_closure_dependencies: null,
     output_wrapper: '(function(){%output%}).call();',
     warning_level: 'VERBOSE',
-    jscomp_warning: 'reportUnknownTypes',
+    jscomp_warning: '*',
     summary_detail_level: 3
   }
 };
@@ -35,7 +36,10 @@ if (!BUILD_MINIFY) {
   CLOSURE_OPTS.compilerFlags.formatting = 'PRETTY_PRINT';
 }
 if (!BUILD_DEBUG) {
-  CLOSURE_OPTS.compilerFlags.define.push('goog.DEBUG=false', 'kivi.DEBUG=false');
+  CLOSURE_OPTS.compilerFlags.define.push('kivi.DEBUG=false');
+}
+if (CLOSURE_NTI) {
+  CLOSURE_OPTS.compilerFlags.new_type_inf = null;
 }
 
 var EXAMPLES = ['hello', 'anim'];
@@ -46,7 +50,7 @@ EXAMPLES.forEach(function(name) {
   gulp.task('js:' + name, ['css:' + name], function() {
     return gulp.src([
         'node_modules/kivi/src/**/*.js',
-        'src/base.js',
+        'node_modules/gcc-bootstrap/bootstrap.js',
         'build/' + name + '/css/css_map.js',
         'src/' + name + '/main.js'])
         .pipe(closureCompiler(CLOSURE_OPTS))

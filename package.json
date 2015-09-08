@@ -19,11 +19,11 @@
     "browser-sync": "^2.9.1",
     "closurecompiler": "^1.5.2",
     "del": "^2.0.1",
+    "gcc-bootstrap": "^0.1.0",
     "google-closure-library": "^20150901.0.0",
     "gulp": "^3.9.0",
     "gulp-closure-compiler": "^0.3.0",
     "gulp-gh-pages": "^0.5.2",
-    "gulp-if": "^1.2.5",
     "gulp-jstyle": "^0.1.1",
     "gulp-replace-ids": "^0.1.1",
     "jstyle": "^0.1.2"
